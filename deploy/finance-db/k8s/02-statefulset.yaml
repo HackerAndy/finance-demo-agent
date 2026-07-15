@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: finance-db
+  namespace: finance
+spec:
+  serviceName: finance-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-db
+  template:
+    metadata:
+      labels:
+        app: finance-db
+    spec:
+      # Pin to pi-node-4: local-path storage means the data volume
+      # lives on this node's disk, so the pod must always run here
+      nodeSelector:
+        kubernetes.io/hostname: pi-node-4
+      containers:
+        - name: postgres
+          # multi-arch image, runs on Pi 4 (linux/arm64)
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            # created by apply.sh (kept out of git — no secrets in code)
+            - secretRef:
+                name: finance-db-auth
+          env:
+            # Subdirectory keeps postgres happy when the volume root
+            # contains lost+found or other provisioner artifacts
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "finance", "-d", "finance"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        # k3s default dynamic provisioner
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 2Gi

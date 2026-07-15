@@ -1,0 +1,62 @@
+# Finance DB on a Mac mini: postgres + flyway migrations + read-only API.
+# Same architecture as the k3s deployment (../finance-db), same migration
+# files — only the runtime differs.
+#
+# Everything binds to 127.0.0.1: the ONLY public ingress is Cloudflare Tunnel
+# pointed at localhost:3000 (see README).
+
+name: finance-db
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finance
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: ${FINANCE_DB_PASSWORD:?copy .env.example to .env and set a password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # localhost only — Postgres is never reachable from the network
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance -d finance"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # One-shot: applies any pending migrations, then exits.
+  # Shares the migration files with the k3s deployment — one schema history.
+  flyway:
+    image: flyway/flyway:10
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/finance
+      FLYWAY_USER: finance
+      FLYWAY_PASSWORD: ${FINANCE_DB_PASSWORD}
+    volumes:
+      - ../finance-db/migrations:/flyway/sql:ro
+
+  # Read-only JSON API (anonymous requests run as web_anon from V3)
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    depends_on:
+      # web_anon role must exist before PostgREST starts
+      flyway:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://finance:${FINANCE_DB_PASSWORD}@postgres:5432/finance
+      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_DB_SCHEMAS: public
+    ports:
+      # localhost only — cloudflared on this host is the sole public entry
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  pgdata:

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-db
+  namespace: finance
+spec:
+  # NodePort so clients on the LAN (e.g. the agent on the Mac)
+  # can reach the DB at <any-pi-ip>:30432
+  type: NodePort
+  selector:
+    app: finance-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      nodePort: 30432

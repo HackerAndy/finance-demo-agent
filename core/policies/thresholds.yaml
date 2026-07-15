@@ -1,0 +1,33 @@
+# Dollar thresholds for human review gates
+# Business-configurable - update quarterly without code changes
+
+# Auto-approve threshold (USD)
+# Invoices under this amount are auto-approved after coding
+auto_approve: 500
+
+# Single approver threshold (USD)
+# Invoices between auto_approve and single_approve need one approver
+single_approver: 5000
+
+# Dual approver threshold (USD)
+# Invoices between single_approve and dual_approve need two approvers
+dual_approver: 25000
+
+# CFO required threshold (USD)
+# Invoices above this need CFO sign-off
+cfo_required: 100000
+
+# PO match tolerance
+# Invoice amount can differ from PO by this percentage without flag
+po_amount_tolerance_pct: 5
+
+# Duplicate detection window (days)
+# Flag invoices with same vendor + amount within this window
+duplicate_window_days: 30
+
+# Escalation timeouts (hours)
+# Time before auto-escalation if no action
+escalation:
+  first_review: 24
+  second_review: 48
+  cfo_review: 72

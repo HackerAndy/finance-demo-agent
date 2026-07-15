@@ -1,0 +1,64 @@
+# PostgREST: exposes the finance DB tables as a read-only JSON API
+# so Excel (Mac) can pull data via Get Data -> From Web.
+# Each table becomes an endpoint: http://<pi-ip>:30480/invoices, /gl_codes, ...
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-api
+  namespace: finance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-api
+  template:
+    metadata:
+      labels:
+        app: finance-api
+    spec:
+      containers:
+        - name: postgrest
+          # multi-arch image, runs on Pi 4 (linux/arm64)
+          image: postgrest/postgrest:v12.2.3
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: finance-db-auth
+                  key: POSTGRES_PASSWORD
+            - name: PGRST_DB_URI
+              value: postgres://finance:$(POSTGRES_PASSWORD)@finance-db:5432/finance
+            # Anonymous requests run as the read-only role from V3 migration
+            - name: PGRST_DB_ANON_ROLE
+              value: web_anon
+            - name: PGRST_DB_SCHEMAS
+              value: public
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-api
+  namespace: finance
+spec:
+  type: NodePort
+  selector:
+    app: finance-api
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      nodePort: 30480

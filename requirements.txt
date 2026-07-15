@@ -1,0 +1,30 @@
+# Finance Demo Agent - Phase 1 Beachhead Requirements
+
+# Core
+pydantic>=2.0
+pyyaml>=6.0
+
+# PDF processing
+pdfplumber>=0.11
+# or: pymupdf>=1.23
+
+# LLM (via OpenRouter)
+openai>=1.0
+httpx>=0.25
+
+# Database
+psycopg2-binary>=2.9
+sqlalchemy>=2.0
+
+# LangGraph (orchestration only)
+langgraph>=0.1
+langgraph-checkpoint-postgres>=1.0
+
+# Testing
+pytest>=8.0
+pytest-asyncio>=0.23
+
+# Dev
+black>=24.0
+ruff>=0.4
+mypy>=1.8

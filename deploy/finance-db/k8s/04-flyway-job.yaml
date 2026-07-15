@@ -1,0 +1,44 @@
+# Runs `flyway migrate` against finance-db using the SQL in the
+# finance-db-migrations ConfigMap (generated from ../migrations by apply.sh).
+# Jobs are immutable, so apply.sh deletes the previous run before applying.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: finance-db-migrate
+  namespace: finance
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: finance-db-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: flyway
+          # multi-arch image, runs on Pi 4 (linux/arm64)
+          image: flyway/flyway:10
+          args: ["migrate"]
+          env:
+            - name: FLYWAY_URL
+              value: jdbc:postgresql://finance-db:5432/finance
+            - name: FLYWAY_USER
+              value: finance
+            - name: FLYWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: finance-db-auth
+                  key: POSTGRES_PASSWORD
+# k3s kubectl -n finance get secret finance-db-auth -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d; echo
+            # Wait up to 2 minutes for postgres to come up on first install
+            - name: FLYWAY_CONNECT_RETRIES
+              value: "24"
+            - name: FLYWAY_CONNECT_RETRIES_INTERVAL
+              value: "5"
+          volumeMounts:
+            - name: migrations
+              mountPath: /flyway/sql
+      volumes:
+        - name: migrations
+          configMap:
+            name: finance-db-migrations
